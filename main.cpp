@@ -69,6 +69,19 @@ List* add_front(char brd[3][3], List* list)
     return res;    
 }
 
+void removeList(List* list)
+{
+    List* current = list;
+    List* nxt;
+
+    while (current != NULL)
+    {
+        nxt = current->next;
+        delete current;
+        current = nxt;
+    }
+}
+
 void copy(char board1[3][3], char board2[3][3])
 {
     for (int i = 0; i < 3; ++i)
@@ -119,9 +132,12 @@ List* perVariants(char board[3][3], char element)
 
 char whoWins(char board[3][3])
 {
-    if (board[0][0] == board[1][1] && board[0][0] == board[2][2] && board[0][0] != '_')
-        return board[0][0];
-
+    if ((board[0][0] == board[1][1] && board[0][0] == board[2][2]) || 
+        (board[0][2] == board[1][1] && board[0][2] == board[2][0])) 
+    {
+        if (board[1][1] != '_')
+            return board[1][1];
+    }
     for (int i = 0; i < 3; ++i)
     {
         if (board[0][i] == board[1][i] && board[0][i] == board[2][i] && board[0][i] != '_')
@@ -215,6 +231,7 @@ int evaluate(char board[3][3], char element)
     }
 
     List* variant = perVariants(board, element);
+    List* delVariant = variant;
     int res = 0;
     std::vector<int> all_res;
 
@@ -222,8 +239,11 @@ int evaluate(char board[3][3], char element)
     {
 	    char t = changeElement(element);
 	    all_res.push_back(evaluate(variant->board, t));
+        variant = variant->next;
     }
-    
+
+    removeList(delVariant);
+
     if (element == 'X')
     {
 	    res = minElement(all_res);
@@ -233,42 +253,74 @@ int evaluate(char board[3][3], char element)
     {
 	    res = maxElement(all_res);
     }
-    
-    // Сделать функцию которая берет доску и игрока и возвращает доску для которой функция evaluate вернулы бы
-    // маскимальное значение 
-
-    //Порождать списко возможных досок и находить оценку
 
     return res;
+}
+
+void bestNextMove(char board[3][3], char element)
+{
+    List* variant = perVariants(board, element);
+    List* delVariant = variant;
+    List* best_variant = NULL;
+    int m = -1;
+
+    while (variant != NULL)
+    {
+        char tmp = changeElement(element);
+        int current_score = evaluate(variant->board, tmp);
+
+        if (current_score > m)
+        {
+            best_variant = variant;
+            m = current_score;
+        }
+        
+        variant = variant->next;
+    }
+
+    if (best_variant != NULL)
+    {
+        for (int i = 0; i < 3; i++)
+        {
+            for (int j = 0; j < 3; j++)
+            {
+                board[i][j] = best_variant->board[i][j];
+            }
+        }
+    }
+
+    removeList(delVariant);
 }
 
 int allNextVariant(char board[3][3], char element)
 {
     if (isFilled(board))
     {
-	return 1;
+	    return 1;
     }
     
     char win = whoWins(board);
 
     if (win == 'X' || win == 'O')
     {
-	return 1;
+	    return 1;
     }
     
     List* variant  = NULL;
-
     variant = perVariants(board, element);
+    List* delVariant = variant;
     int res = 1;
 
     while (variant != NULL)
     {
-	char t = changeElement(element);
-	int tmp = allNextVariant(variant->board, t);
-	res += tmp;
-	variant = variant->next;
+	    char t = changeElement(element);
+	    int tmp = allNextVariant(variant->board, t);
+	    res += tmp;
+	    variant = variant->next;
     }
     
+    removeList(delVariant);
+
     return res;
 }
 
@@ -325,10 +377,10 @@ void Interface(char board[3][3])
     while (!isWin)
     {
         // enter a number and a element
-        std::cout << "Enter a number, which on the screen and a X or O, for example X 1" << std::endl;
+        std::cout << "Enter a number, which on the screen and a X, for example X 1" << std::endl;
         smartDraw(board); 
 
-        std::cout << "Turn " << player << "." << std::endl; 
+        //std::cout << "Turn " << player << "." << std::endl; 
        
         char elem;
         std::cin >> elem; 
@@ -336,21 +388,15 @@ void Interface(char board[3][3])
         int num;
         std::cin >> num;
 
-        if (elem != 'X' && elem != 'O')
+        if (elem != 'X')
         {
-            std::cout << "Incorrect symbol. Please, enter X or O." << std::endl;
+            std::cout << "Incorrect symbol. Please, enter X" << std::endl;
             continue;
         }
 
         if (num < 1 || num > 9)
         {
             std::cout << "The cell number must be between 1 and 9." << std::endl;
-            continue;
-        }
-
-        if (elem != player)
-        {
-            std::cout << "You play for another symbol" << std::endl;
             continue;
         }
 
@@ -376,13 +422,18 @@ void Interface(char board[3][3])
             isWin = true;
         }
 
-        if (player == 'X')
+        bestNextMove(board, 'O');
+
+        res = whoWins(board);
+
+        if (isFilled(board))
         {
-            player = 'O';
+            isWin = true;
         }
-        else
+
+        if (res == 'X' || res == 'O')
         {
-            player = 'X';
+            isWin = true;
         }
     }
 
@@ -395,12 +446,10 @@ void Interface(char board[3][3])
  
 int main()
 {
-    char board[3][3] = {{'X', 'O', 'X'}, {'O', 'O', 'X'}, {'_', '_', '_'}};
-    char elem = 'X';
-    //Interface(board);
-    //int result = allNextVariant(board, elem);
+    char board[3][3] = {{'_', '_', '_'}, {'_', '_', '_'}, {'_', '_', '_'}};
+    char elem = 'O';
+    Interface(board);
     
-    int result;
-    std::cout << result << std::endl;
     return 0;
+
 }
